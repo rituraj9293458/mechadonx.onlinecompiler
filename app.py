@@ -1,48 +1,66 @@
 from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
-from pydantic import BaseModel
-class CodeAnalysis(BaseModel):
-    errors: list[str]
-    bugs: list[str]
-    improvements: list[str]
-    time_complexity: str
-    space_complexity: str
-    optimized_approach: str
-    explanation: str
-    Language:str
-system_prompt_suggestor='''you are an expert software engineer and code reviewer.
+from pydantic import BaseModel,Field
 
-Analyze the provided code WITHOUT modifying it.
+from initialstate import State
+def suggestions(state: State) -> State:
 
-Your job is ONLY to identify problems and provide recommendations for another model that will later correct the code.
+    class CodeAnalysis(BaseModel):
 
-Analyze:
+        errors: list[str] = Field(
+            description="Actual correctness or logic errors that would cause the solution to fail."
+        )
 
-* **Correctness:** syntax errors, logical errors, incorrect behavior, and bugs.
-* **Edge cases:** inputs or situations the code may fail to handle.
-* **Time complexity:** current Big-O complexity and possible improvements.
-* **Space complexity:** current memory usage and possible improvements.
-* **Performance:** unnecessary operations, inefficient algorithms, loops, data structures, or repeated computation.
-* **Code quality:** readability, structure, duplication, maintainability, and design issues.
-* **Improvements:** specific advice on what should be changed and why, including better algorithms or approaches where appropriate.
-* **Priority:** classify issues as CRITICAL, HIGH, MEDIUM, or LOW.
+        suggestions: list[str] = Field(
+            description="Improvements needed to make the code correct or better. Return an empty list if there are no suggestions."
+        )
 
-For every issue, explain the problem, why it matters, and recommend how it should be improved.
+        Timecomplexity: str = Field(
+            description="The time complexity of the current code."
+        )
 
-IMPORTANT:
+        possibletime: str = Field(
+            description="The most suitable possible time complexity for this problem."
+        )
 
-* NEVER modify or rewrite the provided code.
-* NEVER return corrected code.
-* NEVER provide replacement code or code snippets.
-* Only analyze, explain, and recommend.
-* Preserve the original code exactly as provided.
+        codeperfect: bool = Field(
+            description="True only if the code is correct and cannot be meaningfully improved. Otherwise False."
+        )
 
-Your analysis will be passed as structured output to a separate correction model, which will implement the recommended changes.'''
-suggestion_prompt=ChatPromptTemplate.from_messages([
-    ("System",system_prompt_suggestor),
-    ("Human",)
-])
-model=ChatOllama(model="qwen2.5-coder:7b")
+    llm = ChatOllama(model="deepseek-r1:8b")
 
+    Structuredmodel = llm.with_structured_output(CodeAnalysis)
+
+    prompt = ChatPromptTemplate.from_messages([
+        (
+            "system",
+            """You are a code analysis AI.
+               Analyse the given code carefully for correctness, logic errors,
+               possible improvements, and time complexity.
+               Return the analysis according to the provided structured fields."""
+                                      ),
+        (
+           
+            "human",
+            "Analyse this code properly:\n\n{code}"
+        )
+    ])
+
+    chain = prompt | Structuredmodel
+
+    code = state["code"]
+
+    result = chain.invoke({
+        "code": code
+    })
+
+    return {
+        "code": code,
+        "errors": result.errors,
+        "suggestions": result.suggestions,
+        "Timecomplexity": result.Timecomplexity,
+        "possibletime": result.possibletime,
+        "codeperfect": result.codeperfect
+    }
 
