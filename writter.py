@@ -8,44 +8,24 @@ from state import State
 def writternode(state: State) -> State:
 
     class WritingStruct(BaseModel):
-
         code: str = Field(
-            description="Return the complete corrected code only."
+            description="Return complete corrected code only."
         )
 
     code = state["code"]
-    suggestions = state["suggestions"]
-    errors = state["errors"]
+    suggestions = state.get("suggestions", [])
+    errors = state.get("errors", [])
 
     model = ChatOllama(model="qwen2.5-coder:7b")
 
     prompt = ChatPromptTemplate.from_messages([
         (
             "system",
-            """You are a code writing expert.
-
-            Your task is to fix the given code using the provided
-            suggestions and errors.
-
-            Return the complete corrected code only.
-            Do not return explanations.
-            Do not return markdown.
-            Do not return comments."""
+            "You are a code fixer. Fix the provided code using errors and suggestions. Return complete corrected python code only without explanations, comments, or markdown formatting."
         ),
         (
             "human",
-            """Code:
-
-{code}
-
-Suggestions:
-
-{suggestions}
-
-Errors:
-
-{errors}
-"""
+            "Code:\n{code}\n\nErrors:\n{errors}\n\nSuggestions:\n{suggestions}"
         )
     ])
 

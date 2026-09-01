@@ -31,8 +31,11 @@ def checker(state: State) -> bool:
     if state["itterations"] >= 6:
         return True
 
-    if state["codeperfect"] is True and not state["errors"] and not state["suggestions"]:
-        return True
+    # If codeperfect is True and there are no correctness errors
+    if state["codeperfect"] is True and not state["errors"]:
+        # Before iteration 3, ignore suggestions. On iteration >= 3, require suggestions to also be empty.
+        if state["itterations"] < 3 or not state["suggestions"]:
+            return True
 
     return False
 
